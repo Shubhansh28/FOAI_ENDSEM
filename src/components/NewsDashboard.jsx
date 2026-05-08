@@ -25,10 +25,16 @@ export default function NewsDashboard() {
   const [sortBy, setSortBy] = useState('date'); // 'date' or 'source'
   const [showSearch, setShowSearch] = useState(false);
 
-  // Load initial categories
+  // Load categories with staggered timing to avoid rate limits
   useEffect(() => {
-    CATEGORIES.forEach(cat => loadNews(cat.id));
-  }, [loadNews]);
+    // Load first 2 immediately, stagger the rest
+    loadNews('general');
+    const timers = [];
+    CATEGORIES.slice(1).forEach((cat, i) => {
+      timers.push(setTimeout(() => loadNews(cat.id), (i + 1) * 1500));
+    });
+    return () => timers.forEach(clearTimeout);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (e) => {
     e.preventDefault();

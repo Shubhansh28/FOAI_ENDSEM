@@ -28,14 +28,14 @@ export function useISS() {
       const newSpeedHistory = [...speedHistoryRef.current, newSpeedEntry].slice(-30);
       speedHistoryRef.current = newSpeedHistory;
 
-      // Get location name
+      // Get location name (may return null if rate limited)
       const locationName = await reverseGeocode(pos.latitude, pos.longitude);
 
       updateISS({
         latitude: pos.latitude,
         longitude: pos.longitude,
         speed,
-        locationName,
+        ...(locationName ? { locationName } : {}), // Keep previous if rate limited
         positions: newPositions,
         speedHistory: newSpeedHistory,
         timestamp: pos.timestamp,
