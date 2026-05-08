@@ -139,13 +139,9 @@ export async function fetchNews(category = 'general', query = '') {
 
 /**
  * Chat with Hugging Face Mistral model
+ * Uses serverless proxy in production, direct API in dev
  */
 export async function chatWithAI(messages, systemContext) {
-  const token = import.meta.env.VITE_HF_TOKEN || import.meta.env.VITE_AI_TOKEN;
-  if (!token) {
-    throw new Error('Missing Hugging Face token. Add VITE_HF_TOKEN to your .env file.');
-  }
-
   const prompt = `<s>[INST] You are SpaceDesk AI Assistant. You can ONLY answer questions using the following dashboard data. Do NOT use any outside knowledge. If the question is not related to the data provided, say "I can only answer questions about the ISS tracking data and news articles shown on this dashboard."
 
 DASHBOARD DATA:
@@ -153,21 +149,38 @@ ${systemContext}
 
 User question: ${messages[messages.length - 1].content} [/INST]`;
 
-  const res = await fetch(HF_API, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
+  const requestBody = {
+    inputs: prompt,
+    parameters: {
+      max_new_tokens: 500,
+      temperature: 0.7,
+      return_full_text: false,
     },
-    body: JSON.stringify({
-      inputs: prompt,
-      parameters: {
-        max_new_tokens: 500,
-        temperature: 0.7,
-        return_full_text: false,
+  };
+
+  let res;
+  if (IS_PROD) {
+    // Use serverless proxy in production
+    res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    });
+  } else {
+    // Direct API call in development
+    const token = import.meta.env.VITE_HF_TOKEN || import.meta.env.VITE_AI_TOKEN;
+    if (!token) {
+      throw new Error('Missing Hugging Face token. Add VITE_HF_TOKEN to your .env file.');
+    }
+    res = await fetch(HF_API, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-    }),
-  });
+      body: JSON.stringify(requestBody),
+    });
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
